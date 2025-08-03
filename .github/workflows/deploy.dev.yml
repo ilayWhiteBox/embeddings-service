@@ -3,7 +3,7 @@ name: Deploy Row Service
 on:
   push:
     branches:
-      - dev
+      - main
 
 env:
   PROJECT_ID: daring-thought-467213-m5
