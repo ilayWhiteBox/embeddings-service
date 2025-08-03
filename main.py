@@ -1,9 +1,17 @@
 from flask import Flask, request, jsonify
+import logging
+import numpy as np
+import torch
 from sentence_transformers import SentenceTransformer
 from transformers import pipeline
-import torch
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics.pairwise import cosine_similarity
 
+# Initialize Flask app
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Detect device
 device = 0 if torch.cuda.is_available() else -1
@@ -20,6 +28,36 @@ sentiment_pipeline = pipeline(
     device=device
 )
 
+@app.route("/cluster", methods=["POST"])
+def cluster_embeddings():
+    try:
+        body = request.get_json(force=True)
+
+        embeddings = np.array(body.get("embeddings", []))
+        distance_threshold = float(body.get("distance_threshold", 0.6))
+
+        if embeddings.ndim == 1:
+            embeddings = embeddings.reshape(1, -1)
+        if embeddings.shape[0] < 2:
+            return jsonify({"labels": list(range(embeddings.shape[0]))})
+
+        # Use 1 - cosine similarity to preserve original logic
+        similarity_matrix = cosine_similarity(embeddings)
+        distance_matrix = 1 - similarity_matrix
+
+        clustering = AgglomerativeClustering(
+            n_clusters=None,
+            metric="precomputed",
+            linkage="average",
+            distance_threshold=distance_threshold
+        )
+        labels = clustering.fit_predict(distance_matrix)
+
+        return jsonify({"labels": labels.tolist()})
+    except Exception as e:
+        logging.exception("Error occurred in /cluster endpoint")
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/embed", methods=["POST"])
 def generate_embeddings():
     try:
@@ -31,6 +69,7 @@ def generate_embeddings():
         embeddings = embedding_model.encode(inputs, convert_to_tensor=False)
         return jsonify({"embeddings": [emb.tolist() for emb in embeddings]})
     except Exception as e:
+        logging.exception("Error occurred in /embed endpoint")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/sentiment", methods=["POST"])
@@ -44,8 +83,10 @@ def analyze_sentiment():
         results = sentiment_pipeline(inputs)
         return jsonify({"results": results})
     except Exception as e:
+        logging.exception("Error occurred in /sentiment endpoint")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/healthz", methods=["GET"])
 def health_check():
     return jsonify({"status": "ok"})
+
