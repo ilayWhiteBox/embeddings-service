@@ -8,7 +8,7 @@ on:
 env:
   PROJECT_ID: daring-thought-467213-m5
   REGION: us-central1
-  SERVICE_NAME: embedding-service
+  SERVICE_NAME: models-service
 
 jobs:
   deploy:
