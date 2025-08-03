@@ -4,8 +4,6 @@ FROM python:3.11-slim
 # Set working directory inside the container
 WORKDIR /app
 
-ARG JOB_NAME
-
 COPY requirements.txt ./requirements.txt
 
 RUN pip install -r requirements.txt
